@@ -1,6 +1,6 @@
 # Uses the split program to divide a dataset into files, each consisting of at
 # most n lines.
-function filesplit(source, dest_dir, file_prefix="file_", n = 5000)
+function filesplit(source, dest_dir; file_prefix="", n = 5000)
     if !isdir(dest_dir)
         mkpath(dest_dir)
     end
