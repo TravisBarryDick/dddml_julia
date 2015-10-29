@@ -1,43 +1,44 @@
-function subsample(source_dir, total_lines, desired_lines)
+function subsample(source_dir, total_lines, desired_lines, dim)
+    ys = Array(Int, 0)
+    xs_unshaped = Array(Float64, 0)
+    files = files_in_dir(source_dir)
     p = desired_lines / total_lines
-    lines = @parallel vcat for file in files_in_dir(source_dir)
-        subsample_worker(file, p)::Vector{ASCIIString}
-    end
-    lines
-end
-
-function subsample_worker(file, p)
-    lines = Array(ASCIIString, 0)
-    fh = open(file, "r")
-    for line in eachline(fh)
-        if rand() < p
-            push!(lines, line)
+    np = nprocs()
+    n = length(files)
+    i = 1
+    nextidx() = (idx = i; i += 1; idx)
+    @sync begin
+        for p in 1:np
+            if p != myid() || np == 1
+                @async begin
+                    while true
+                        idx = nextidx()
+                        if idx > n
+                            break
+                        end
+                        file_ys, file_xs = remotecall_fetch(p, subsample_worker,
+                                                            files[idx], p, dim)
+                        append!(ys, file_ys)
+                        append!(xs_unshaped, file_xs)
+                    end
+                end
+            end
         end
     end
-    lines
-end
-
-function subsample_parsed(source_dir, total_lines, desired_lines, dim)
-    p = desired_lines / total_lines
-    params = [(f,p,dim) for f in files_in_dir(source_dir)]
-    ysxs = pmap(subsample_parsed_worker, params)
-    ys = vcat([ys for (ys,xs) in ysxs]...)
-    xs = hcat([xs for (ys,xs) in ysxs]...)
+    xs = reshape(xs_unshaped, dim, div(length(xs_unshaped), dim))
     return ys, xs
 end
 
-function subsample_parsed_worker(params)
-    file, p, dim = params
+function subsample_worker(file, p, dim)
     ys = Array(Int, 0)
-    xs = Array(Vector{Float64}, 0)
+    xs = Array(Float64, 0)
     fh = open(file, "r")
     for line in eachline(fh)
         if rand() < p
             y, x = libsvm_parse_line(line, dim)
             push!(ys, y)
-            push!(xs, x)
+            append!(xs, x)
         end
     end
-    xs_mat = reshape(hcat(xs...), dim, length(xs))
-    ys, xs_mat
+    ys, xs
 end
