@@ -19,16 +19,15 @@ end
 
 function subsample_parsed(source_dir, total_lines, desired_lines, dim)
     p = desired_lines / total_lines
-
-    ysxs = @parallel vcat for file in files_in_dir(source_dir)
-        subsample_parsed_worker(file, p, dim)
-    end
+    params = [(f,p,dim) for f in files_in_dir(source_dir)]
+    ysxs = pmap(subsample_parsed_worker, params)
     ys = vcat([ys for (ys,xs) in ysxs]...)
     xs = hcat([xs for (ys,xs) in ysxs]...)
     return ys, xs
 end
 
-function subsample_parsed_worker(file, p, dim)
+function subsample_parsed_worker(params)
+    file, p, dim = params
     ys = Array(Int, 0)
     xs = Array(Vector{Float64}, 0)
     fh = open(file, "r")
