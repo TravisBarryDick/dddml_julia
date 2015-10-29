@@ -2,7 +2,7 @@ function subsample(source_dir, total_lines, desired_lines, dim)
     ys = Array(Int, 0)
     xs_unshaped = Array(Float64, 0)
     files = files_in_dir(source_dir)
-    p = desired_lines / total_lines
+    line_prob = desired_lines / total_lines
     np = nprocs()
     n = length(files)
     i = 1
@@ -17,7 +17,7 @@ function subsample(source_dir, total_lines, desired_lines, dim)
                             break
                         end
                         file_ys, file_xs = remotecall_fetch(p, subsample_worker,
-                                                            files[idx], p, dim)
+                                                files[idx], line_prob, dim)
                         append!(ys, file_ys)
                         append!(xs_unshaped, file_xs)
                     end
