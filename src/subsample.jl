@@ -40,5 +40,6 @@ function subsample_worker(file, p, dim)
             append!(xs, x)
         end
     end
+    close(fh)
     ys, xs
 end
