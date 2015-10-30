@@ -23,16 +23,7 @@ function random_dispatch(source_dir, k, num_learners, dim)
     end
     @printf("Dispatched examples %d in %.2f sec (%.2f examples / sec)\n",
             dispatched, duration, dispatched / duration)
-    @sync begin
-        for p in 2:num_learners+1
-            @async begin
-                remotecall_wait(p, train_models, dim)
-            end
-        end
-    end
 end
-
-cluster_to_learner(ix, num_learners) = ((ix - 1) % num_learners) + 2
 
 function random_dispatch_worker(file, k, num_learners, dim)
     cys = [Array(Int, 0) for i in 1:k]
@@ -55,3 +46,5 @@ function random_dispatch_worker(file, k, num_learners, dim)
     end
     return count
 end
+
+cluster_to_learner(ix, num_learners) = ((ix - 1) % num_learners) + 2
