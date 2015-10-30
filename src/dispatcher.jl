@@ -1,3 +1,5 @@
+using LIBLINEAR
+
 function random_dispatch(source_dir, k, num_learners, dim)
     files = files_in_dir(source_dir)
     np = nprocs()
@@ -26,6 +28,9 @@ function random_dispatch(source_dir, k, num_learners, dim)
     for p in 2:num_learners+1
         remotecall_wait(p, list_data)
     end
+    for p in 2:num_learners+1
+        remotecall_wait(p, train_models, dim)
+    end
 end
 
 cluster_to_learner(ix, num_learners) = ((ix - 1) % num_learners) + 2
@@ -53,6 +58,7 @@ function random_dispatch_worker(file, k, num_learners, dim)
 end
 
 const learner_data = Dict{Int, Tuple{Vector{Int}, Vector{Float64}}}()
+const models = Dict{Int, Model}
 
 function learner_append_data(cix, ys, xs)
     global learner_data
@@ -66,5 +72,13 @@ end
 function list_data()
     for (k,v) in learner_data
         println("$k : $(length(v[1])) examples.")
+    end
+end
+
+function train_models(dim)
+    for (k, v) in learner_data
+        ys, xs_unshaped = v
+        xs = reshape(xs_unshaped, dim, div(length(xs_unshaped), div))
+        models[k] = linear_train(ys, xs, verbose=true)
     end
 end
