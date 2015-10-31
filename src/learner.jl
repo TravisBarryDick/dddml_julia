@@ -12,15 +12,13 @@ function learner_append_data(cix, ys, xs)
     append!(learner_data[cix][2], xs)
 end
 
-function train_models(num_learners, dim)
+train_models(wa::WorkerAssignment, params::Parameters) = train_models(wa, params.dim)
+
+function train_models(wa, dim)
     global learner_data
     global learner_models
-    @sync begin
-        for p in 2:num_learners+1
-            @async begin
-                remotecall_wait(p, train_models_worker, dim)
-            end
-        end
+    @sync for w in learners(wa)
+        @async remotecall_wait(w, train_models_worker, dim)
     end
 end
 

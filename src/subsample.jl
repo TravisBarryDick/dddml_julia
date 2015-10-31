@@ -1,32 +1,17 @@
-function subsample(source_dir, total_lines, desired_lines, dim)
+subsample(wa::WorkerAssignment, params::Parameters) = subsample(wa, params.train_directory, params.train_size, params.subsample_size, params.dim)
+
+function subsample(wa, source_dir, total_lines, desired_lines, dim)
     ys = Array(Int, 0)
-    xs_unshaped = Array(Float64, 0)
+    xs = Array(Float64, 0)
     files = files_in_dir(source_dir)
     line_prob = desired_lines / total_lines
-    np = nprocs()
-    n = length(files)
-    i = 1
-    nextidx() = (idx = i; i += 1; idx)
-    @sync begin
-        for p in 1:np
-            if p != myid() || np == 1
-                @async begin
-                    while true
-                        idx = nextidx()
-                        if idx > n
-                            break
-                        end
-                        file_ys, file_xs = remotecall_fetch(p, subsample_worker,
-                                                files[idx], line_prob, dim)
-                        append!(ys, file_ys)
-                        append!(xs_unshaped, file_xs)
-                    end
-                end
-            end
-        end
+    function do_job(w, i)
+        fy, fx = remotecall_fetch(w, subsample_worker, files[i], line_prob, dim)
+        append!(ys, fy)
+        append!(xs, fx)
     end
-    xs = reshape(xs_unshaped, dim, div(length(xs_unshaped), dim))
-    return ys, xs
+    schedule_jobs(workers(wa), length(files), do_job)
+    ys, reshape(xs, dim, div(length(xs),dim))
 end
 
 function subsample_worker(file, p, dim)

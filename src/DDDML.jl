@@ -1,16 +1,36 @@
 module DDDML
 
-include("filesplit.jl")
-include("subsample.jl")
+# Parameters and configuration
+include("WorkerAssignment.jl")
+include("Parameters.jl")
+export WorkerAssignment
+export Parameters
+
+# Some utiltiies
+include("Scheduler.jl")
 include("libsvm_parse.jl")
 include("filesystem_tools.jl")
+
+# Splitting training files into job-sized files
+include("filesplit.jl")
+export filesplit
+
+# Subsampling the data
+include("subsample.jl")
+export subsample
+
+# Dispatching the data
 include("approx_nns.jl")
 include("kmeans.jl")
 include("dispatcher.jl")
-include("learner.jl")
-include("testing.jl")
+export init_dispatchers, random_dispatch, cluster_dispatch
 
-export filesplit, subsample, cluster, build_nns, find_nn, random_dispatch
-export train_models, random_testing, init_dispatchers, dispatch, testing
+# Code for the learners
+include("learner.jl")
+export train_models, predict
+
+# Code to query testing data one-by-one
+include("testing.jl")
+export random_testing, cluster_testing
 
 end

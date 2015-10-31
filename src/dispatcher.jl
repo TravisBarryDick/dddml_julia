@@ -1,11 +1,12 @@
-function init_dispatchers(source_dir, total_lines, desired_lines, dim, k, num_learners)
-    ys, xs = subsample(source_dir, total_lines, desired_lines, dim)
+init_dispatchers(wa::WorkerAssignment, params::Parameters) =
+    init_dispatchers(wa, params.train_directory, params.train_size,
+                     params.subsample_size, params.dim, params.k)
+
+function init_dispatchers(wa, source_dir, total_lines, desired_lines, dim, k)
+    ys, xs = subsample(wa, source_dir, total_lines, desired_lines, dim)
     cost, as = cluster(xs, k)
-    np = nprocs()
-    @sync begin
-        for p in (num_learners+2):np
-            @async remotecall_wait(p, init_dispatchers_worker, xs, as)
-        end
+    @sync for w in dispatchers(wa)
+        @async remotecall_wait(w, init_dispatchers_worker, xs, as)
     end
 end
 
@@ -15,34 +16,29 @@ function init_dispatchers_worker(xs, as)
     global const dispatcher_nns = build_nns(xs)
 end
 
-function dispatch(source_dir, k, num_learners, dim)
+function dispatch(wa, worker_fn, source_dir, dim, k)
     files = files_in_dir(source_dir)
-    np = nprocs()
-    n = length(files)
-    i = 1
     dispatched = 0
-    incdispatched(count) = dispatched += count
-    nextidx() = (idx = i; i += 1; idx)
-    duration = @elapsed @sync begin
-        for p in (num_learners+2):np
-            @async begin
-                while true
-                    idx = nextidx()
-                    if idx > n
-                        break
-                    end
-                    c = remotecall_fetch(p, dispatch_worker,
-                                         files[idx], k, num_learners, dim)
-                    incdispatched(c)
-                end
-            end
-        end
+    function do_job(w, i)
+        count = remotecall_fetch(w, worker_fn, wa, files[i], dim, k)
+        dispatched += count
     end
-    @printf("Dispatched examples %d in %.2f sec (%.2f examples / sec)\n",
-            dispatched, duration, dispatched / duration)
+    duration = @elapsed schedule_jobs(dispatchers(wa), length(files), do_job)
+    @printf("Dispatched %d examples in %.2f seconds (%.4f ms/example)\n",
+            dispatched, duration, duration / dispatched * 1000)
 end
 
-function dispatch_worker(file, k, num_learners, dim)
+random_dispatch(wa, source_dir, dim, k) =
+    dispatch(wa, random_dispatch_worker, source_dir, dim, k)
+random_dispatch(wa, params) =
+    random_dispatch(wa, params.train_directory, params.dim, params.k)
+
+cluster_dispatch(wa, source_dir, dim, k) =
+    dispatch(wa, cluster_dispatch_worker, source_dir, dim, k)
+cluster_dispatch(wa, params) =
+    cluster_dispatch(wa, params.train_directory, params.dim, params.k)
+
+function dispatch_worker(wa, file, dim, k, rand_dispatch)
     global dispatcher_nns
     global dispatcher_as
     cys = [Array(Int, 0) for i in 1:k]
@@ -52,69 +48,23 @@ function dispatch_worker(file, k, num_learners, dim)
     for line in eachline(fh)
         count += 1
         y, x = libsvm_parse_line(line, dim)
-        nn_ix = find_nn(dispatcher_nns, x)[1][1]
-        cix = dispatcher_as[nn_ix]
+        if rand_dispatch
+            cix = rand(1:k)
+        else
+            nn_ix = find_nn(dispatcher_nns, x)[1][1]
+            cix = dispatcher_as[nn_ix]
+        end
         push!(cys[cix], y)
         append!(cxs[cix], x)
     end
     close(fh)
-    for cix in 1:k
-        learner_ix = cluster_to_learner(cix, num_learners)
-        if length(cys[cix]) > 0
-            remotecall(learner_ix, learner_append_data, cix, cys[cix], cxs[cix])
-        end
+    for i in 1:k
+        if length(cys[i]) == 0; continue; end
+        remotecall(get_learner(wa, i), learner_append_data, i, cys[i], cxs[i])
     end
     return count
 end
 
+random_dispatch_worker(wa, file, dim, k) = dispatch_worker(wa, file, dim, k, true)
 
-function random_dispatch(source_dir, k, num_learners, dim)
-    files = files_in_dir(source_dir)
-    np = nprocs()
-    n = length(files)
-    i = 1
-    dispatched = 0
-    incdispatched(count) = dispatched += count
-    nextidx() = (idx = i; i += 1; idx)
-    duration = @elapsed @sync begin
-        for p in (num_learners+2):np
-            @async begin
-                while true
-                    idx = nextidx()
-                    if idx > n
-                        break
-                    end
-                    c = remotecall_fetch(p, random_dispatch_worker,
-                                        files[idx], k, num_learners, dim)
-                    incdispatched(c)
-                end
-            end
-        end
-    end
-    @printf("Dispatched examples %d in %.2f sec (%.2f examples / sec)\n",
-            dispatched, duration, dispatched / duration)
-end
-
-function random_dispatch_worker(file, k, num_learners, dim)
-    cys = [Array(Int, 0) for i in 1:k]
-    cxs = [Array(Float64, 0) for i in 1:k]
-    fh = open(file, "r")
-    count = 0
-    for line in eachline(fh)
-        count += 1
-        y, x = libsvm_parse_line(line, dim)
-        cix = rand(1:k)
-        push!(cys[cix], y)
-        append!(cxs[cix], x)
-    end
-    close(fh)
-    for cix in 1:k
-        learner_ix = cluster_to_learner(cix, num_learners)
-        if length(cys[cix]) > 0
-            remotecall(learner_ix, learner_append_data, cix, cys[cix], cxs[cix])
-        end
-    end
-    return count
-end
-
-cluster_to_learner(ix, num_learners) = ((ix - 1) % num_learners) + 2
+cluster_dispatch_worker(wa, file, dim, k) = dispatch_worker(wa, file, dim, k, false)
