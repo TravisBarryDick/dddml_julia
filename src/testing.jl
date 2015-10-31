@@ -21,7 +21,7 @@ random_testing(wa, params) =
 cluster_testing(wa, source_dir, dim, k) =
     testing(wa, cluster_testing_worker, source_dir, dim, k)
 cluster_testing(wa, params) =
-    cluster_testing(wa, params.train_directory, params.dim, params.k)
+    cluster_testing(wa, params.test_directory, params.dim, params.k)
 
 function testing_worker(wa, file, dim, k, rand_dispatch)
     fh = open(file, "r")
