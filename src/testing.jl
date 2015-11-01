@@ -8,9 +8,10 @@ function testing(wa, worker_fn, source_dir, dim, k)
         total += t
     end
     duration = @elapsed schedule_jobs(dispatchers(wa), length(files), do_job)
-    @printf("Accuracy: %d / %d (%.2f)\n", correct, total, correct / total)
-    @printf("Time: %d queries in %.2f sec (%.4f ms/query)\n",
-            total, duration, duration / total * 1000)
+    @printf("Tested %d examples in %.2f sec\n", total, duration)
+    @printf("  Accuracy: %d / %d (%.4f)\n", correct, total, correct / total)
+    @printf("  Average query time: %.4f ms\n", duration / total * num_dispatchers(wa) * 1000)
+    return correct, total, duration
 end
 
 random_testing(wa, source_dir, dim, k) =

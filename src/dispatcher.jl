@@ -3,11 +3,14 @@ init_dispatchers(wa::WorkerAssignment, params::Parameters) =
                      params.subsample_size, params.dim, params.k)
 
 function init_dispatchers(wa, source_dir, total_lines, desired_lines, dim, k)
+    tic()
     ys, xs = subsample(wa, source_dir, total_lines, desired_lines, dim)
     cost, as = cluster(xs, k)
     @sync for w in dispatchers(wa)
         @async remotecall_wait(w, init_dispatchers_worker, xs, as)
     end
+    duration = toq()
+    @printf("Dispatchers initialized in %.2f sec\n", duration)
 end
 
 function init_dispatchers_worker(xs, as)
@@ -25,7 +28,8 @@ function dispatch(wa, worker_fn, source_dir, dim, k)
     end
     duration = @elapsed schedule_jobs(dispatchers(wa), length(files), do_job)
     @printf("Dispatched %d examples in %.2f seconds (%.4f ms/example)\n",
-            dispatched, duration, duration / dispatched * 1000)
+            dispatched, duration, duration / dispatched * 1000 *
+            num_dispatchers(wa))
 end
 
 random_dispatch(wa, source_dir, dim, k) =

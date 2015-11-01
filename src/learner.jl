@@ -15,11 +15,14 @@ end
 train_models(wa::WorkerAssignment, params::Parameters) = train_models(wa, params.dim)
 
 function train_models(wa, dim)
+    tic()
     global learner_data
     global learner_models
     @sync for w in learners(wa)
         @async remotecall_wait(w, train_models_worker, dim)
     end
+    duration = toq()
+    @printf("Trained models in %.2f sec\n", duration)
 end
 
 function train_models_worker(dim)
