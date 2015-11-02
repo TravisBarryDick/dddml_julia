@@ -2,15 +2,17 @@ function testing(wa, worker_fn, source_dir, dim, k)
     files = files_in_dir(source_dir)
     correct = 0
     total = 0
+    dispatcher_time = 0
     function do_job(w, i)
-        c, t = remotecall_fetch(w, worker_fn, wa, files[i], dim, k)
+        c, t, d = remotecall_fetch(w, worker_fn, wa, files[i], dim, k)
         correct += c
         total += t
+        dispatcher_time += d
     end
     duration = @elapsed schedule_jobs(dispatchers(wa), length(files), do_job)
     @printf("Tested %d examples in %.2f sec\n", total, duration)
     @printf("  Accuracy: %d / %d (%.4f)\n", correct, total, correct / total)
-    @printf("  Average query time: %.4f ms\n", duration / total * num_dispatchers(wa) * 1000)
+    @printf("  Average query time: %.4f ms\n", dispatcher_time / total * 1000)
     return correct, total, duration
 end
 
@@ -28,6 +30,7 @@ function testing_worker(wa, file, dim, k, rand_dispatch)
     fh = open(file, "r")
     total = 0
     correct = 0
+    tic()
     for line in eachline(fh)
         y, x = libsvm_parse_line(line, dim)
         if rand_dispatch
@@ -43,8 +46,9 @@ function testing_worker(wa, file, dim, k, rand_dispatch)
             correct += 1
         end
     end
+    duration = toq()
     close(fh)
-    return correct, total
+    return correct, total, duration
 end
 
 random_testing_worker(wa, file, dim, k) =
