@@ -33,4 +33,8 @@ export train_models, predict
 include("testing.jl")
 export random_testing, cluster_testing
 
+# Code for processing the output logs
+include("process_logs.jl")
+export parse_log_file, parse_log_directory, parse_results_directory
+
 end
