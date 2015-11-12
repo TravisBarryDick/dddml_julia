@@ -54,18 +54,23 @@ function main()
 
     params = Parameters(train_dir, test_dir, dim, num_examples, subsample_size, k)
     println(params)
+    flush(STDOUT)
 
     # Initialize the dispatchers
     dispatch_init_time = @elapsed init_dispatchers(wa, params)
+    flush(STDOUT)
 
     # Dispatch the training data in batches
     cluster_dispatch(wa, params)
+    flush(STDOUT)
 
     # Train the models
     train_time = @elapsed train_models(wa, params)
+    flush(STDOUT)
 
     # Test the models
     correct, total, test_time = cluster_testing(wa, params)
+    flush(STDOUT)
 end
 
 main()
