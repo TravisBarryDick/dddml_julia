@@ -1,8 +1,13 @@
 immutable WorkerAssignment
     num_workers::Int
     num_learners::Int
+    num_dispatchers::Int
 end
-WorkerAssignment(num_learners) = WorkerAssignment(nprocs() - 1, num_learners)
+WorkerAssignment(num_learners) =
+    WorkerAssignment(nprocs() - 1, num_learners, nprocs() - 1 - num_learners)
+
+WorkerAssignment(num_learners, num_dispatchers) =
+    WorkerAssignment(num_learners + num_dispatchers, num_learners, num_dispatchers)
 
 function wrap(i, n)
     ix = (i - 1) % n + 1
@@ -15,7 +20,7 @@ end
 # How many of each kind of worker are there?
 num_workers(wa::WorkerAssignment) = wa.num_workers
 num_learners(wa::WorkerAssignment) = wa.num_learners
-num_dispatchers(wa::WorkerAssignment) = wa.num_workers - wa.num_learners
+num_dispatchers(wa::WorkerAssignment) = wa.num_dispatchers
 
 # Given the index of either a learner or a dispatcher, return the worker index.
 # Wraps indices around, so this can actually be used to assign job numbers to
