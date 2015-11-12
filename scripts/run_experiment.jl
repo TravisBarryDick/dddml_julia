@@ -1,14 +1,52 @@
 using DDDML
+using ArgParse
 
 function main()
-    base_directory = ARGS[1] # should contain train and test directories
-    k = parse(Int, ARGS[2]) # the number of clusters to use
-    nl = parse(Int, ARGS[3]) # the number of learners to use
-    dim = parse(Int, ARGS[4]) # the dimension of the data
-    num_examples = parse(Int, ARGS[5]) # number of training examples
-    subsample_size = parse(Int, ARGS[6]) # dispatch sample size
+    aps = ArgParseSettings()
+    @add_arg_table aps begin
+        "--base_directory", "-b"
+            help = "Path to parent of train and test directories"
+            required = true
+        "--clusters", "-k"
+            help = "Number of clusters"
+            arg_type = Int
+            required = true
+        "--num_learners", "-l"
+            help = "Number of learners"
+            arg_type = Int
+            required = true
+        "--num_dispatchers", "-s"
+            help = "Number of dispatchers (-1 for auto)"
+            arg_type = Int
+            default = -1
+        "--dimension", "-d"
+            help = "Dimensionality of data"
+            arg_type = Int
+            required = true
+        "--train_size", "-n"
+            help = "Number of training examples"
+            arg_type = Int
+            required = true
+        "--dispatch_size", "-m"
+            help = "Number of samples to use for dispatch and clustering"
+            arg_type = Int
+            required = true
+    end
 
-    wa = WorkerAssignment(nl)
+    parsed_args = parse_args(ARGS, aps)
+
+    base_directory = parsed_args["base_directory"]
+    k = parsed_args["clusters"]
+    nl = parsed_args["num_learners"]
+    nd = parsed_args["num_dispatchers"]
+    if nd == -1
+        nd = nprocs() - 1 - nl
+    end
+    dim = parsed_args["dimension"]
+    num_examples = parsed_args["train_size"]
+    subsample_size = parsed_args["dispatch_size"]
+
+    wa = WorkerAssignment(nl, nd)
     println(wa)
 
     train_dir = joinpath(base_directory, "train")
