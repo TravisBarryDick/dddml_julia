@@ -18,21 +18,30 @@ function train_models(wa, dim)
     tic()
     global learner_data
     global learner_models
+    learn_times = Dict{Int, Float64}()
     @sync for w in learners(wa)
-        @async remotecall_wait(w, train_models_worker, dim)
+        @async begin
+            times = remotecall_fetch(w, train_models_worker, dim)
+            for (k,v) in times
+                learn_times[k] = v
+            end
+        end
     end
     duration = toq()
+    println("Cluster learning times: ", [v for (k,v) in learn_times])
     @printf("Trained models in %.2f sec\n", duration)
 end
 
 function train_models_worker(dim)
     global learner_data
     global learner_models
+    times = Dict{Int, Float64}()
     for (k, v) in learner_data
         ys, xs_unshaped = v
         xs = reshape(xs_unshaped, dim, div(length(xs_unshaped), dim))
-        learner_models[k] = linear_train(ys, xs)
+        times[k] = @elapsed learner_models[k] = linear_train(ys, xs)
     end
+    return times
 end
 
 function predict(cix, xs)
