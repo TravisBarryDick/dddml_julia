@@ -6,6 +6,7 @@ function init_dispatchers(wa, source_dir, total_lines, desired_lines, dim, k)
     tic()
     ys, xs = subsample(wa, source_dir, total_lines, desired_lines, dim)
     cost, as = cluster(xs, k)
+    println("Cluster sizes: ", cluster_sizes(k, as))
     @sync for w in dispatchers(wa)
         @async remotecall_wait(w, init_dispatchers_worker, xs, as)
     end
